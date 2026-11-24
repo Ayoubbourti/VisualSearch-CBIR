@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Galerie{% endblock %}
+
+{# Macro récursive : arbre de catégories sur autant de niveaux que nécessaire. #}
+{% macro render_items(nodes, current) %}
+  {% for n in nodes %}
+  <li>
+    <a href="{{ url_for('gallery.index', category=n.id) }}" class="{{ 'active' if current == n.id|string }}">
+      <svg class="icon"><use href="#i-folder"/></svg>{{ n.name }}<span class="count">{{ n.count }}</span></a>
+    {% if n.children %}<ul class="tree">{{ render_items(n.children, current) }}</ul>{% endif %}
+  </li>
+  {% endfor %}
+{% endmacro %}
+
+{% block content %}
+<header class="page-head">
+  <div><h1>Galerie</h1>
+    <p class="lede">Importez, classez et retrouvez vos images. Cliquez sur la loupe d'une image pour chercher des images similaires.</p></div>
+</header>
+
+<div class="layout">
+  <aside class="card">
+    <h3>Catégories</h3>
+    <ul class="tree root">
+      <li><a href="{{ url_for('gallery.index') }}" class="{{ 'active' if not cat }}"><svg class="icon"><use href="#i-grid"/></svg>Toutes les images</a></li>
+      <li><a href="{{ url_for('gallery.index', category='none') }}" class="{{ 'active' if cat == 'none' }}"><svg class="icon"><use href="#i-folder"/></svg>Sans catégorie</a></li>
+      {{ render_items(tree, cat) }}
+    </ul>
+
+    <hr>
+    <form method="post" action="{{ url_for('gallery.create_category') }}" class="stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input name="name" placeholder="Nom de la catégorie" aria-label="Nom de la nouvelle catégorie" required>
+      <select name="parent_id" aria-label="Catégorie parente">
+        <option value="">À la racine</option>
+        {% for cid, label in flat_cats %}<option value="{{ cid }}" {{ 'selected' if current_cat == cid }}>{{ label }}</option>{% endfor %}
+      </select>
+      <button class="btn">Créer la catégorie</button>
+    </form>
+
+    {% if current_cat %}
+    <hr>
+    <h4>Catégorie « {{ crumbs[-1].name }} »</h4>
+    <form method="post" action="{{ url_for('gallery.rename_category', cid=current_cat) }}" class="stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input name="name" value="{{ crumbs[-1].name }}" aria-label="Nouveau nom" required>
+      <button class="btn">Renommer</button>
+    </form>
+    <form method="post" action="{{ url_for('gallery.move_category', cid=current_cat) }}" class="stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <select name="parent_id" aria-label="Nouveau parent">
+        <option value="">À la racine</option>
+        {% for cid, label in flat_cats if cid != current_cat %}<option value="{{ cid }}">{{ label }}</option>{% endfor %}
+      </select>
+      <button class="btn">Déplacer la catégorie</button>
+    </form>
+    <form method="post" action="{{ url_for('gallery.delete_category', cid=current_cat) }}" class="stack"
+          data-confirm="Supprimer cette catégorie et ses sous-catégories ? Les images sont conservées.">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="btn danger"><svg class="icon"><use href="#i-trash"/></svg>Supprimer la catégorie</button>
+    </form>
+    {% endif %}
+  </aside>
+
+  <section>
+    <form method="post" action="{{ url_for('images.upload') }}" enctype="multipart/form-data" class="dropzone" data-dropzone>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <svg class="icon" style="width:1.8rem;height:1.8rem;color:var(--cyan)"><use href="#i-upload"/></svg>
+      <div class="dz-text">
+        <strong data-dz-title>Déposez vos images ici</strong>
+        <span data-dz-hint>ou choisissez des fichiers. JPEG, PNG, WebP, GIF, BMP, TIFF.</span>
+      </div>
+      <input type="file" name="files" id="files" multiple accept="image/*" required>
+      <label class="btn" for="files">Choisir des fichiers</label>
+      <select name="category_id" aria-label="Catégorie de destination">
+        <option value="">Sans catégorie</option>
+        {% for cid, label in flat_cats %}<option value="{{ cid }}" {{ 'selected' if current_cat == cid }}>{{ label }}</option>{% endfor %}
+      </select>
+      <button class="btn primary" data-dz-submit disabled>Importer</button>
+    </form>
+    {% if not api_up %}<div class="flash warning" role="alert"><svg class="icon"><use href="#i-alert"/></svg><span>L'API de descripteurs est arrêtée (lancez <code>python -m api.app</code>). Les images importées n'auront pas de descripteurs tant que vous ne les aurez pas calculés.</span></div>{% endif %}
+
+    <nav class="crumbs" aria-label="Fil d'Ariane">
+      {% if crumbs %}<a href="{{ url_for('gallery.index') }}">Galerie</a>{% for c in crumbs %}<span>/</span>{% if loop.last %}<b>{{ c.name }}</b>{% else %}<a href="{{ url_for('gallery.index', category=c.id) }}">{{ c.name }}</a>{% endif %}{% endfor %}
+      {% else %}<b>{{ 'Sans catégorie' if cat == 'none' else 'Toutes les images' }}</b>{% endif %}
+      <span class="muted">— {{ total }} image{{ 's' if total > 1 }}</span>
+    </nav>
+
+    <form method="get" class="filters">
+      <input type="search" name="q" value="{{ q }}" placeholder="Rechercher par nom de fichier" aria-label="Rechercher par nom">
+      <select name="sort" aria-label="Trier par" data-autosubmit>
+        <option value="new" {{ 'selected' if sort == 'new' }}>Plus récentes</option>
+        <option value="old" {{ 'selected' if sort == 'old' }}>Plus anciennes</option>
+        <option value="name" {{ 'selected' if sort == 'name' }}>Nom (A → Z)</option>
+        <option value="size" {{ 'selected' if sort == 'size' }}>Plus lourdes</option>
+      </select>
+      {% if cat %}<input type="hidden" name="category" value="{{ cat }}">{% endif %}
+      <button class="btn">Filtrer</button>
+    </form>
+
+    <form method="post" id="sel">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="toolbar">
+        <label class="sel-count"><input type="checkbox" data-select-all=".pick" aria-label="Tout sélectionner"><span data-sel-label>Tout sélectionner</span></label>
+        <button class="btn sm" formaction="{{ url_for('images.download_zip') }}"><svg class="icon"><use href="#i-download"/></svg>Télécharger (ZIP)</button>
+        <span class="inline-label">Déplacer vers</span>
+        <select name="target_category" aria-label="Catégorie cible">
+          <option value="">Sans catégorie</option>
+          {% for cid, label in flat_cats %}<option value="{{ cid }}">{{ label }}</option>{% endfor %}
+        </select>
+        <button class="btn sm" formaction="{{ url_for('gallery.move_images') }}"><svg class="icon"><use href="#i-move"/></svg>Déplacer</button>
+        <button class="btn sm danger" formaction="{{ url_for('images.delete_images') }}" data-confirm="Supprimer définitivement les images sélectionnées ?"><svg class="icon"><use href="#i-trash"/></svg>Supprimer</button>
+        <button class="btn sm ghost" formaction="{{ url_for('images.refresh_descriptors') }}" title="Calcule les descripteurs des images qui n'en ont pas"><svg class="icon"><use href="#i-refresh"/></svg>Calculer les descripteurs manquants</button>
+      </div>
+
+      <div class="grid">
+        {% for im in images %}
+        <figure class="thumb">
+          <input type="checkbox" class="pick" name="ids" value="{{ im.id }}" aria-label="Sélectionner {{ im.filename }}">
+          <a href="{{ url_for('images.image_detail', iid=im.id) }}"><img loading="lazy" src="{{ url_for('images.image_thumb', iid=im.id) }}" alt="{{ im.filename }}"></a>
+          <figcaption>
+            <span title="{{ im.filename }}">{{ im.filename.split('/')[-1] }}</span>
+            {% if im.has_desc %}<a href="{{ url_for('search.page', query_id=im.id) }}" title="Trouver des images similaires" aria-label="Trouver des images similaires à {{ im.filename }}"><svg class="icon"><use href="#i-search"/></svg></a>
+            {% else %}<span class="tag-warn" title="Descripteurs non calculés"><svg class="icon"><use href="#i-alert"/></svg></span>{% endif %}
+          </figcaption>
+        </figure>
+        {% else %}
+        <div class="empty" style="grid-column:1/-1"><h3>Aucune image ici</h3><p>Déposez des fichiers dans la zone ci-dessus pour les ajouter à cette vue.</p></div>
+        {% endfor %}
+      </div>
+    </form>
+
+    {% if pages > 1 %}
+    <nav class="pager" aria-label="Pagination">
+      {% if page > 1 %}<a class="btn" href="{{ url_for('gallery.index', page=page-1, category=cat or None, q=q or None, sort=sort) }}">Précédent</a>{% endif %}
+      <span>Page {{ page }} / {{ pages }}</span>
+      {% if page < pages %}<a class="btn" href="{{ url_for('gallery.index', page=page+1, category=cat or None, q=q or None, sort=sort) }}">Suivant</a>{% endif %}
+    </nav>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

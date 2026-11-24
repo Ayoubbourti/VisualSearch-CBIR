@@ -1,0 +1,38 @@
+# Lancement :  SECRET_KEY=$(python -c "import secrets;print(secrets.token_hex(32))") \
+#              DESCRIPTOR_API_KEY=$(python -c "import secrets;print(secrets.token_hex(16))") \
+#              docker compose up --build
+# L'application est alors sur http://localhost:5000 (mettre un proxy HTTPS devant en production).
+services:
+  api:
+    build: .
+    command: ["gunicorn", "-w", "2", "-b", "0.0.0.0:5001", "--timeout", "300", "api.app:create_app()"]
+    environment:
+      DESCRIPTOR_API_KEY: ${DESCRIPTOR_API_KEY:?définir DESCRIPTOR_API_KEY}
+    # Pas de « ports: » : l'API n'est joignable que par l'application web (réseau interne).
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:5001/api/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  web:
+    build: .
+    depends_on:
+      api: {condition: service_healthy}
+    environment:
+      SECRET_KEY: ${SECRET_KEY:?définir SECRET_KEY}
+      DESCRIPTOR_API_URL: http://api:5001
+      DESCRIPTOR_API_KEY: ${DESCRIPTOR_API_KEY:?définir DESCRIPTOR_API_KEY}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}   # true derrière un proxy HTTPS
+    ports: ["5000:5000"]
+    volumes: ["gallery-data:/data"]                            # base SQLite + images : à sauvegarder
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:5000/healthz')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  gallery-data:

@@ -1,0 +1,6 @@
+-r requirements.txt
+pytest>=8.0
+pytest-cov>=5.0
+ruff>=0.5
+matplotlib>=3.8        # figures du rapport (scripts/make_figures.py)
+python-docx>=1.1       # génération du rapport (docs/build_report.py)

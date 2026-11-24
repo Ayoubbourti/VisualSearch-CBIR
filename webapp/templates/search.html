@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Images similaires{% endblock %}
+{% block content %}
+<nav class="crumbs" aria-label="Fil d'Ariane"><a href="{{ url_for('gallery.index') }}">Galerie</a><span>/</span><a href="{{ url_for('images.image_detail', iid=img.id) }}">{{ img.filename }}</a><span>/</span><b>Images similaires</b></nav>
+
+<section class="card search-head" id="app" data-query="{{ img.id }}" data-csrf="{{ csrf_token }}"
+     data-search="{{ url_for('search.api_search') }}" data-feedback="{{ url_for('search.api_feedback') }}">
+  <img class="query" src="{{ url_for('images.image_thumb', iid=img.id) }}" alt="Image requête : {{ img.filename }}">
+  <div>
+    <h1 style="font-size:1.6rem">Chercher des images proches de {{ img.filename }}</h1>
+    <ol class="steps">
+      <li>Lancez la recherche simple.</li>
+      <li>Cliquez sur les résultats qui vous conviennent : ils sont marqués en vert.</li>
+      <li>« Affiner » recalcule le classement à partir de vos choix (Re-weighting Type-1). Recommencez autant que nécessaire.</li>
+    </ol>
+    <div class="row">
+      <label class="k-field">Résultats <input id="k" type="number" min="1" max="{{ max_k }}" value="{{ default_k }}"></label>
+      <button class="btn primary" id="btnSearch"><svg class="icon"><use href="#i-search"/></svg>Recherche simple</button>
+      <button class="btn" id="btnFeedback" disabled><svg class="icon"><use href="#i-wand"/></svg>Affiner&nbsp;(<span id="nSel">0</span>)</button>
+      <button class="btn ghost" id="btnReset" disabled>Réinitialiser</button>
+    </div>
+    <p id="status" class="status" role="status"></p>
+    <div id="weights" class="weights" hidden></div>
+  </div>
+</section>
+<div id="results" class="grid"></div>
+<script src="{{ url_for('static', filename='search.js') }}" defer></script>
+{% endblock %}

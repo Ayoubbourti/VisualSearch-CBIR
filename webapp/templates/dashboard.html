@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Vue d'ensemble{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <h1>Bonjour {{ g.user.username }}</h1>
+    <p class="lede">{% if total %}Votre galerie contient {{ "{:,}".format(total).replace(",", " ") }} image{{ 's' if total > 1 }} réparties en {{ categories }} catégorie{{ 's' if categories > 1 }}.{% else %}Votre galerie est vide pour le moment.{% endif %}</p>
+  </div>
+  <div class="row">
+    <a class="btn" href="{{ url_for('gallery.index') }}"><svg class="icon"><use href="#i-upload"/></svg>Importer des images</a>
+    <a class="btn primary" href="{{ url_for('gallery.index') }}"><svg class="icon"><use href="#i-grid"/></svg>Ouvrir la galerie</a>
+  </div>
+</header>
+
+<section class="panel spectrum-panel" aria-labelledby="hue-title">
+  <div class="panel-head" style="margin-bottom:0"><div><h2 id="hue-title">Les couleurs de votre galerie</h2>
+    <p class="muted" style="margin:0">Répartition des teintes dans toutes vos images indexées.</p></div></div>
+  {% if hues %}
+  <div class="spectrum" role="img" aria-label="Répartition des teintes : {% for h in hues %}{{ h.name }} {{ h.pct }} %{{ ', ' if not loop.last }}{% endfor %}">
+    {% for h in hues %}<i style="--c:{{ h.color }};--i:{{ loop.index0 }};flex-grow:{{ [h.pct, 3]|max }}" title="{{ h.name }} : {{ h.pct }} %"></i>{% endfor %}
+  </div>
+  <div class="spectrum-legend">
+    {% for h in hues %}<span><i style="--c:{{ h.color }}"></i>{{ h.name }} <b>{{ h.pct }} %</b></span>{% endfor %}
+  </div>
+  <p class="muted" style="margin:.8rem 0 0;font-size:.85rem">{{ neutral_pct }} % des pixels sont neutres (gris, noir, blanc) et ne figurent pas dans ce graphique.</p>
+  {% else %}
+  <div class="empty"><h3>Pas encore de couleurs à afficher</h3><p>Importez des images : leurs descripteurs sont calculés automatiquement et alimentent ce graphique.</p></div>
+  {% endif %}
+</section>
+
+<section class="card kpis" aria-label="Chiffres clés">
+  <div class="kpi"><span>Images</span><strong>{{ "{:,}".format(total).replace(",", " ") }}</strong><small>dans votre galerie</small></div>
+  <div class="kpi"><span>Images indexées</span><strong>{{ "{:,}".format(indexed).replace(",", " ") }}</strong><small>{{ (indexed / total * 100)|round(1) if total else 0 }} % avec descripteurs</small></div>
+  <div class="kpi"><span>Catégories</span><strong>{{ categories }}</strong><small>hiérarchie illimitée</small></div>
+  <div class="kpi"><span>Espace occupé</span><strong>{{ (total_bytes / 1024 / 1024)|round(1) }} <em>Mo</em></strong><small>fichiers originaux</small></div>
+</section>
+
+<div class="dash-grid">
+  <section class="panel">
+    <div class="panel-head"><h2>Derniers ajouts</h2><a href="{{ url_for('gallery.index') }}">Tout voir</a></div>
+    {% if recent %}
+    <div class="recent-grid">
+      {% for im in recent %}
+      <a class="recent-item" href="{{ url_for('images.image_detail', iid=im.id) }}">
+        <img src="{{ url_for('images.image_thumb', iid=im.id) }}" alt="{{ im.filename }}" loading="lazy">
+        <span title="{{ im.filename }}">{{ im.filename.split('/')[-1] }}</span><small>{{ im.width }} × {{ im.height }} px</small>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty"><h3>Aucune image pour l'instant</h3><p>Importez vos premières photos pour explorer leurs couleurs et leurs textures.</p><a class="btn primary" href="{{ url_for('gallery.index') }}">Importer des images</a></div>
+    {% endif %}
+  </section>
+  <aside class="panel">
+    <div class="panel-head"><h2>Services</h2></div>
+    <div class="service"><span class="dot"></span><div><strong>Application web</strong><small>Flask</small></div><span class="badge">En ligne</span></div>
+    <div class="service"><span class="dot {{ '' if api_up else 'off' }}"></span><div><strong>API de descripteurs</strong><small>Flask-RESTful, port {{ api_port }}</small></div><span class="badge {{ '' if api_up else 'off' }}">{{ 'En ligne' if api_up else 'Hors ligne' }}</span></div>
+    <h3 style="margin-top:1.4rem">Formats de fichiers</h3>
+    {% for ext, n in formats %}<div class="bar-row"><span>.{{ ext }}</span><div class="track"><i style="width:{{ (n / formats[0][1] * 100)|round }}%"></i></div><b>{{ n }}</b></div>{% else %}<p class="muted">Aucun format à afficher.</p>{% endfor %}
+  </aside>
+</div>
+{% endblock %}

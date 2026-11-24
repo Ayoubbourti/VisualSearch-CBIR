@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}{{ img.filename }}{% endblock %}
+{% block head %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.js') }}" defer></script>
+<script src="{{ url_for('static', filename='image.js') }}" defer></script>
+{% endblock %}
+{% block content %}
+<nav class="crumbs" aria-label="Fil d'Ariane">
+  <a href="{{ url_for('gallery.index') }}">Galerie</a>
+  {% for c in crumbs %}<span>/</span><a href="{{ url_for('gallery.index', category=c.id) }}">{{ c.name }}</a>{% endfor %}
+  <span>/</span><b>{{ img.filename }}</b>
+</nav>
+
+<div class="detail">
+  <section class="card">
+    <div class="viewer"><img class="big" src="{{ url_for('images.image_file', iid=img.id) }}" alt="{{ img.filename }}"></div>
+    <h2 style="margin-bottom:.2rem">{{ img.filename }}</h2>
+    <div class="meta">
+      <span class="chip">{{ img.width }} × {{ img.height }} px</span>
+      <span class="chip">{{ (img.size_bytes / 1024)|round(1) }} Ko</span>
+      {% if crumbs %}<span class="chip"><svg class="icon"><use href="#i-folder"/></svg>{% for c in crumbs %}{{ c.name }}{{ ' / ' if not loop.last }}{% endfor %}</span>{% endif %}
+      {% if parent %}<a class="chip" href="{{ url_for('images.image_detail', iid=parent.id) }}"><svg class="icon"><use href="#i-wand"/></svg>Dérivée de {{ parent.filename }}</a>{% endif %}
+    </div>
+    {% if children %}<p class="muted" style="font-size:.88rem">Images dérivées :
+      {% for c in children %}<a href="{{ url_for('images.image_detail', iid=c.id) }}">{{ c.filename }}</a>{{ ', ' if not loop.last }}{% endfor %}</p>{% endif %}
+    <div class="row">
+      {% if details %}<a class="btn primary" href="{{ url_for('search.page', query_id=img.id) }}"><svg class="icon"><use href="#i-search"/></svg>Images similaires</a>{% endif %}
+      <a class="btn" href="{{ url_for('images.image_download', iid=img.id) }}"><svg class="icon"><use href="#i-download"/></svg>Télécharger</a>
+      <form method="post" action="{{ url_for('images.delete_images') }}" data-confirm="Supprimer cette image ?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="ids" value="{{ img.id }}">
+        <button class="btn danger"><svg class="icon"><use href="#i-trash"/></svg>Supprimer</button></form>
+    </div>
+    <hr>
+    <form method="post" action="{{ url_for('gallery.move_images') }}" class="row">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="ids" value="{{ img.id }}">
+      <select name="target_category" aria-label="Catégorie"><option value="">Sans catégorie</option>
+        {% for cid, label in flat_cats %}<option value="{{ cid }}" {{ 'selected' if img.category_id == cid }}>{{ label }}</option>{% endfor %}</select>
+      <button class="btn">Changer de catégorie</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2><svg class="icon" style="color:var(--magenta)"><use href="#i-wand"/></svg> Créer une image transformée</h2>
+    <p class="muted">Le résultat est enregistré comme une nouvelle image. L'original n'est jamais modifié.</p>
+    <form method="post" action="{{ url_for('images.transform', iid=img.id) }}" id="tf" class="stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <select name="op" id="op" aria-label="Transformation">{% for key, (label, _f) in operations.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select>
+      <div class="params" data-for="crop"><p class="muted">Origine (x, y) et taille (largeur × hauteur) en pixels. Image : {{ img.width }} × {{ img.height }}.</p>
+        <div class="row"><label class="field">x<input name="x" type="number" min="0" value="0"></label><label class="field">y<input name="y" type="number" min="0" value="0"></label>
+        <label class="field">Largeur<input name="w" type="number" min="1" value="{{ img.width // 2 }}"></label><label class="field">Hauteur<input name="h" type="number" min="1" value="{{ img.height // 2 }}"></label></div></div>
+      <div class="params" data-for="resize"><p class="muted">Indiquez un pourcentage, ou une largeur et/ou une hauteur (le ratio est conservé si une seule est donnée).</p>
+        <div class="row"><label class="field">Pourcentage<input name="scale" type="number" step="any" placeholder="ex. 50"></label><label class="field">Largeur<input name="width" type="number"></label><label class="field">Hauteur<input name="height" type="number"></label></div></div>
+      <div class="params" data-for="rotate"><p class="muted">Angle en degrés, sens anti-horaire.</p><input name="angle" type="number" step="any" value="90" aria-label="Angle"></div>
+      <div class="params" data-for="blur"><p class="muted">Rayon du flou (0 à 50).</p><input name="radius" type="number" step="any" value="2" aria-label="Rayon"></div>
+      <div class="params" data-for="brightness contrast saturation"><p class="muted">Facteur : 1 laisse l'image inchangée, 0 à 10 autorisés.</p><input name="factor" type="number" step="any" value="1.3" aria-label="Facteur"></div>
+      <button class="btn primary">Créer l'image transformée</button>
+    </form>
+  </section>
+</div>
+
+{% if details %}
+<section class="card">
+  <div class="panel-head"><h2>Descripteurs de contenu visuel</h2></div>
+  <div class="cols">
+    <div><h4>Histogramme de couleur (HSV 8 × 3 × 3)</h4><div class="chart-box"><canvas id="chHist" aria-label="Histogramme de couleur HSV" role="img"></canvas></div></div>
+    <div><h4>Histogramme LBP (uniforme, P = 8, R = 1)</h4><div class="chart-box"><canvas id="chLbp" aria-label="Histogramme LBP" role="img"></canvas></div></div>
+  </div>
+  <hr>
+  <div class="cols">
+    <div>
+      <h4>Couleurs dominantes</h4>
+      <div class="palette" role="img" aria-label="Palette des couleurs dominantes">{% for c in details.color.dominant_colors %}
+        <div class="swatch" style="background:{{ c.hex }}" title="{{ c.hex }}"><span>{{ (c.proportion*100)|round(1) }} %</span></div>{% endfor %}</div>
+      <table><tr><th>Couleur</th><th>RGB</th><th>Part</th></tr>
+        {% for c in details.color.dominant_colors %}<tr><td><span class="swatch-dot" style="background:{{ c.hex }}"></span>{{ c.hex }}</td><td class="num">{{ c.rgb|join(', ') }}</td><td class="num">{{ (c.proportion*100)|round(1) }} %</td></tr>{% endfor %}</table>
+      <h4>Moments de couleur (HSV)</h4>
+      <table><tr><th>Canal</th><th>Moyenne</th><th>Écart-type</th><th>Asymétrie</th></tr>
+        {% for ch, m in details.color.moments.items() %}<tr><td>{{ ch }}</td><td class="num">{{ '%.4f'|format(m.mean) }}</td><td class="num">{{ '%.4f'|format(m.std) }}</td><td class="num">{{ '%.4f'|format(m.skewness) }}</td></tr>{% endfor %}</table>
+    </div>
+    <div>
+      <h4>Matrice de co-occurrence (GLCM)</h4>
+      <table><tr><th>Caractéristique</th><th>Valeur</th></tr>
+        {% set glcm_fr = {'contrast': 'Contraste', 'correlation': 'Corrélation', 'energy': 'Énergie', 'homogeneity': 'Homogénéité', 'dissimilarity': 'Dissimilarité', 'entropy': 'Entropie'} %}
+        {% for k, v in details.texture.glcm.items() %}<tr><td>{{ glcm_fr.get(k, k) }}</td><td class="num">{{ '%.5f'|format(v) }}</td></tr>{% endfor %}</table>
+    </div>
+  </div>
+</section>
+<script type="application/json" id="descriptors-data">{{ details|tojson }}</script>
+{% else %}
+<div class="flash warning" role="alert"><svg class="icon"><use href="#i-alert"/></svg><span>Les descripteurs de cette image ne sont pas calculés. Lancez l'API (<code>python -m api.app</code>), puis utilisez « Calculer les descripteurs manquants » dans la galerie.</span></div>
+{% endif %}
+{% endblock %}

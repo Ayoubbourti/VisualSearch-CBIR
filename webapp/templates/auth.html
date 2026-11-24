@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Inscription' if mode == 'register' else 'Connexion' }}{% endblock %}
+{% block content_anon %}
+<div class="auth-wrap">
+  <section class="auth-side">
+    <a class="brand" href="{{ url_for('auth.login') }}" style="color:#fff"><span class="brand-mark"></span><span>Visual<b style="color:#C9C5F2">Search</b></span></a>
+    <div>
+      <h2>Retrouvez une image par ce qu'elle montre.</h2>
+      <p>Importez vos photos, explorez leurs couleurs et leurs textures, puis cherchez des images similaires.</p>
+    </div>
+    <div class="auth-spectrum" aria-hidden="true">
+      {% for c in ['#FF4D6D','#FFB84A','#E8E84A','#43E5A0','#2BD9F2','#6D8BFF','#B06BFF','#FF4FA3'] %}<i style="--c:{{ c }};--i:{{ loop.index0 }}"></i>{% endfor %}
+    </div>
+  </section>
+  <section class="auth-form">
+    <h1>{{ 'Créer un compte' if mode == 'register' else 'Se connecter' }}</h1>
+    <p class="muted">{{ 'Choisissez un identifiant et un mot de passe de 8 caractères minimum.' if mode == 'register' else 'Entrez vos identifiants pour accéder à votre galerie.' }}</p>
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Identifiant <input name="username" required autofocus autocomplete="username" minlength="3" maxlength="40"></label>
+      <label>Mot de passe <input name="password" type="password" required autocomplete="{{ 'new-password' if mode == 'register' else 'current-password' }}"{% if mode == 'register' %} minlength="8"{% endif %}></label>
+      <button class="btn primary">{{ "Créer mon compte" if mode == 'register' else 'Se connecter' }}</button>
+    </form>
+    <p class="auth-alt">
+      {% if mode == 'register' %}Vous avez déjà un compte ? <a href="{{ url_for('auth.login') }}">Se connecter</a>
+      {% else %}Pas encore de compte ? <a href="{{ url_for('auth.register') }}">Créer un compte</a>{% endif %}
+    </p>
+  </section>
+</div>
+{% endblock %}

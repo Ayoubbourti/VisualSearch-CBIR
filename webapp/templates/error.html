@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Erreur {{ code }}{% endblock %}
+{% macro body() %}
+<div class="card error-card">
+  <p class="muted">Erreur {{ code }}</p>
+  <h1 style="font-size:1.8rem">{{ title }}</h1>
+  <p class="muted">{{ message }}</p>
+  <div class="row"><a class="btn primary" href="{{ url_for('gallery.index') if g.user else url_for('auth.login') }}">{{ 'Retourner à la galerie' if g.user else 'Aller à la connexion' }}</a></div>
+</div>
+{% endmacro %}
+{% block content %}{{ body() }}{% endblock %}
+{% block content_anon %}{{ body() }}{% endblock %}

@@ -1,0 +1,22 @@
+# Environnement / caches
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.env
+
+# Données : jamais versionnées (volumineuses, licence du dataset, données personnelles)
+data/
+results/
+webapp/instance/
+*.db
+*.db-wal
+*.db-shm
+
+# Fichiers générés
+docs/*.pdf
+docs/figures/
